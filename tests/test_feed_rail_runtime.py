@@ -1,0 +1,45 @@
+import pathlib,shutil,subprocess,tempfile,unittest
+from test_account_appearance_runtime import STUBS
+from soufit import dexpatch
+ROOT=pathlib.Path(__file__).resolve().parents[1]
+class FeedRailTest(unittest.TestCase):
+ @unittest.skipUnless(shutil.which('javac') and shutil.which('java'),'JDK required')
+ def test_visibility_and_account_isolation(self):
+  sources={k:STUBS[k] for k in ['android/content/Context.java','android/content/SharedPreferences.java']}
+  sources.update({
+   'bk/soufit/feed/VideoActions.java':'package bk.soufit.feed;public class VideoActions{public static void accountChanged(){} public static void bindNative(Object c){} public static void selected(Object c,Object p){}}',
+   'bk/soufit/feed/Repost.java':'package bk.soufit.feed;public class Repost{public static void reload(){} public static void anchor(Object c){} public static boolean visibility(android.view.View v,int value){return false;}public static boolean replacing(android.view.View v){return false;}}',
+
+   'android/view/View.java':'package android.view;public class View{public static int VISIBLE=0,INVISIBLE=4,GONE=8;int visibility;public int writes;public boolean isAttachedToWindow(){return true;}public int getVisibility(){return visibility;}public void setVisibility(int v){visibility=v;writes++;}public void post(Runnable r){r.run();}}',
+   'bk/soufit/core/soufiT.java':'package bk.soufit.core;public class soufiT{public static android.content.Context context=new android.content.Context();public static android.content.Context context(){return context;}}',
+   'bk/soufit/profile/AccountAppearance.java':'package bk.soufit.profile;public class AccountAppearance{public static String uid="111";public static android.content.SharedPreferences prefs(android.content.Context c){return c.getSharedPreferences(uid,0);}}',
+   'bk/soufit/core/Diary.java':'package bk.soufit.core;public class Diary{public static void note(String s){}}',
+   'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long uptimeMillis(){return 100000;}}',
+   'bk/soufit/theme/Md3.java':'package bk.soufit.theme;public class Md3{public static void rail(android.view.View v,int kind){}public static void icons(android.view.View v,int kind){}}',
+   'bk/soufit/feed/FeedRail.java':(ROOT/'inject/java/bk/soufit/feed/FeedRail.java').read_text(encoding='utf-8'),
+   'bk/soufit/Test.java':'''package bk.soufit;import bk.soufit.profile.AccountAppearance;import bk.soufit.feed.FeedRail;import android.view.View;public class Test{
+static void check(boolean b,String s){if(!b)throw new AssertionError(s);}public static void main(String[] a){
+com.ss.android.ugc.aweme.feed.assem.digg.VideoDiggAssem component=new com.ss.android.ugc.aweme.feed.assem.digg.VideoDiggAssem();View v=component.getContentView();FeedRail.bindNative(component);check(v.getVisibility()==0,"default stays native");
+FeedRail.setShown(0,false);check(v.getVisibility()==8,"live hide");FeedRail.setVisibility(v,0);check(v.getVisibility()==8,"native show cannot flicker hidden slot");FeedRail.setVisibility(v,4);FeedRail.setShown(0,true);check(v.getVisibility()==4,"restore latest native intent, not forced visible");
+FeedRail.setVisibility(v,0);FeedRail.setShown(0,false);AccountAppearance.uid="222";FeedRail.reloadSettings();check(v.getVisibility()==0,"second account defaults");AccountAppearance.uid="111";FeedRail.reloadSettings();check(v.getVisibility()==8,"first account retained");
+View unrelated=new View();FeedRail.setVisibility(unrelated,4);check(unrelated.getVisibility()==4,"unregistered comments/media unchanged");int writes=v.writes;FeedRail.bindNative(component);check(v.writes==writes,"repeat binding no redraw");FeedRail.bindNative(new Object());FeedRail.setVisibility(null,0);check(FeedRail.shown(-1),"unknown kind untouched");
+for(int i=0;i<4;i++)FeedRail.setShown(i,false);com.ss.android.ugc.aweme.feed.assem.share.VideoShareAssem share=new com.ss.android.ugc.aweme.feed.assem.share.VideoShareAssem();FeedRail.bindNative(share);check(share.getContentView().getVisibility()==8,"newly created share hidden immediately");
+}}'''
+  })
+  for name in ['com.ss.android.ugc.aweme.feed.assem.digg.VideoDiggAssem','com.ss.android.ugc.aweme.feed.assem.share.VideoShareAssem']:
+   pkg,cl=name.rsplit('.',1);sources[name.replace('.','/')+'.java']='package '+pkg+';public class '+cl+'{android.view.View view=new android.view.View();public android.view.View getContentView(){return view;}}'
+  with tempfile.TemporaryDirectory() as folder:
+   files=[]
+   __import__("android_doubles").with_mod(sources)
+   for name,source in sources.items():
+    f=pathlib.Path(folder)/name;f.parent.mkdir(parents=True,exist_ok=True);f.write_text(source,encoding='utf-8');files.append(str(f))
+   result=subprocess.run(['javac','-source','8','-target','8','-encoding','UTF-8','-d',folder,*files],capture_output=True,text=True);self.assertEqual(0,result.returncode,result.stderr)
+   result=subprocess.run(['java','-cp',folder,'bk.soufit.Test'],capture_output=True,text=True);self.assertEqual(0,result.returncode,result.stderr)
+ def test_all_four_hooks_and_native_setter(self):
+  with tempfile.TemporaryDirectory() as folder:
+   for i,owner in enumerate(dexpatch.RAIL_CLASSES):
+    code='.class public '+owner+'\n.super Ljava/lang/Object;\n.method public final onViewCreated(Landroid/view/View;)V\n    .registers 20\n    return-void\n.end method\n'
+    (pathlib.Path(folder)/(str(i)+'.smali')).write_text(code,encoding='utf-8')
+   counts=dexpatch.rewrite_anchored(folder);self.assertEqual(4,counts['native right-area slots']);self.assertFalse(dexpatch.rewrite_anchored(folder))
+   f=pathlib.Path(folder)/'visibility.smali';f.write_text('invoke-virtual {v0, v1}, Landroid/view/View;->setVisibility(I)V\n',encoding='utf-8')
+   dexpatch.rewrite_models(folder);self.assertIn('FeedRail;->setVisibility(Landroid/view/View;I)V',f.read_text(encoding='utf-8'))

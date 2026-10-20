@@ -45,3 +45,8 @@ Other commands:
 ./build.sh verify build/soufit.apk                # check that an APK is signed
 ./build.sh tools hashes                           # print SHA-256 of each cached tool
 ```
+
+## License
+
+* **Core License:** GPL-3.0-only — see [LICENSE](LICENSE).
+* **Upstream Terms:** Subject to additional terms from the original project — see [ADDITIONAL-TERMS.md](https://git.narez.xyz/narezany/MargyT/src/branch/main/ADDITIONAL-TERMS.md).

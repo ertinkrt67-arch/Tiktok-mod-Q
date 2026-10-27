@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">Fixture</string>
-  <color name="ic_back">#FF0050</color>
+    <string name="app_name">TikTok-Q</string>
 </resources>

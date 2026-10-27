@@ -1,19 +1,16 @@
-# soufiT
+# Tiktok-Q
 
-soufiT is a mod for TikTok on Android. `build.sh` takes an official TikTok APK, patches it, and produces a signed APK with the mod included.
+Q-T is a mod for TikTok on Android. `build.sh` takes an official TikTok APK, patches it, and produces a signed APK with the mod included.
 
-This is a fork of [MargyT](https://git.narez.xyz/narezany/MargyT).
 
-## Status
 
-I made this fork because I wanted to see the mod work the way I like it. I got tired of maintaining it, so it is released as an archive only. There is no further support, and it contains bugs. Use it at your own risk.
 
 ## Features
 
 - Broken "Liquid Glass" theme
 - Incomplete / half-baked AMOLED theme 
 - Showcase for Badges and Gradients 
-- Completely stripped automatic requests to the original MargyT server (including crash log reporting) 
+- Completely stripped automatic requests to the original server (including crash log reporting) 
 - Skip login and birthday prompts
 - Display user region and language
 - Blocked yzewe.ru
